@@ -8,9 +8,9 @@ product_infomation:
 
 ## AI アシスト
 ai_assist:
-  format_style: markdown + yaml + gherkin
+  format_style: markdown + toml + gherkin
   primary_targets:
-    - ./spec/ubi/ubiquitous.yaml
+    - ./spec/ubi/ubiquitous.toml
 ```
 
 # BDD-Rungame
