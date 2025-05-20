@@ -11,7 +11,7 @@ ai_assist:
   format_style: markdown + yaml + gherkin
   primary_targets:
     - ./spec/ubi/ubiquitous.yaml
-
+```
 
 # BDD-Rungame
 
