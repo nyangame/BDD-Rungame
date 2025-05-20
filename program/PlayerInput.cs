@@ -1,266 +1,212 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// プレイヤーの入力を管理するクラス
+/// InputSystemを使用して入力を処理します
 /// </summary>
 public class PlayerInput : MonoBehaviour
 {
-    [Header("Key Settings")]
-    [SerializeField] private KeyCode jumpKey = KeyCode.Space;
-    [SerializeField] private KeyCode slideKey = KeyCode.LeftControl;
-    [SerializeField] private KeyCode leftKey = KeyCode.A;
-    [SerializeField] private KeyCode rightKey = KeyCode.D;
-    [SerializeField] private KeyCode attackKey = KeyCode.F;
+    [Header("Input Settings")]
+    [SerializeField] private InputActionAsset inputActions;
     
-    [Header("Touch Settings")]
-    [SerializeField] private float swipeThreshold = 50f;
-    [SerializeField] private float tapMaxMovement = 10f;
-
-    // タッチ入力用の変数
-    private Vector2 _touchStartPosition;
-    private Vector2 _touchEndPosition;
-    private bool _isTouching = false;
-    private float _touchStartTime;
-    private float _maxTapDuration = 0.3f;
+    // InputActionリファレンス
+    private InputAction _moveAction;
+    private InputAction _jumpAction;
+    private InputAction _slideAction;
+    private InputAction _attackAction;
+    private InputAction _pauseAction;
     
-    // スワイプ検出用のクールダウン
-    private float _swipeCooldown = 0.2f;
-    private float _lastSwipeTime = 0f;
-
+    // 入力値
+    private Vector2 _moveInput;
+    private bool _jumpPressed;
+    private bool _slidePressed;
+    private bool _attackPressed;
+    private bool _pausePressed;
+    
+    // Actionsマップ
+    private InputActionMap _gameplayActionMap;
+    
+    private void Awake()
+    {
+        // InputActionマップを取得
+        _gameplayActionMap = inputActions.FindActionMap("Gameplay");
+        
+        // 各アクションを取得
+        _moveAction = _gameplayActionMap.FindAction("Move");
+        _jumpAction = _gameplayActionMap.FindAction("Jump");
+        _slideAction = _gameplayActionMap.FindAction("Slide");
+        _attackAction = _gameplayActionMap.FindAction("Attack");
+        _pauseAction = _gameplayActionMap.FindAction("Pause");
+        
+        // イベントの登録
+        _moveAction.performed += OnMove;
+        _moveAction.canceled += OnMove;
+        
+        _jumpAction.performed += OnJump;
+        _jumpAction.canceled += OnJump;
+        
+        _slideAction.performed += OnSlide;
+        _slideAction.canceled += OnSlide;
+        
+        _attackAction.performed += OnAttack;
+        _attackAction.canceled += OnAttack;
+        
+        _pauseAction.performed += OnPause;
+    }
+    
+    private void OnEnable()
+    {
+        // アクションの有効化
+        _gameplayActionMap.Enable();
+    }
+    
+    private void OnDisable()
+    {
+        // アクションの無効化
+        _gameplayActionMap.Disable();
+    }
+    
+    private void OnDestroy()
+    {
+        // イベントの登録解除
+        _moveAction.performed -= OnMove;
+        _moveAction.canceled -= OnMove;
+        
+        _jumpAction.performed -= OnJump;
+        _jumpAction.canceled -= OnJump;
+        
+        _slideAction.performed -= OnSlide;
+        _slideAction.canceled -= OnSlide;
+        
+        _attackAction.performed -= OnAttack;
+        _attackAction.canceled -= OnAttack;
+        
+        _pauseAction.performed -= OnPause;
+    }
+    
+    /// <summary>
+    /// 移動入力イベントハンドラ
+    /// </summary>
+    private void OnMove(InputAction.CallbackContext context)
+    {
+        _moveInput = context.ReadValue<Vector2>();
+    }
+    
+    /// <summary>
+    /// ジャンプ入力イベントハンドラ
+    /// </summary>
+    private void OnJump(InputAction.CallbackContext context)
+    {
+        _jumpPressed = context.ReadValueAsButton();
+    }
+    
+    /// <summary>
+    /// スライド入力イベントハンドラ
+    /// </summary>
+    private void OnSlide(InputAction.CallbackContext context)
+    {
+        _slidePressed = context.ReadValueAsButton();
+    }
+    
+    /// <summary>
+    /// 攻撃入力イベントハンドラ
+    /// </summary>
+    private void OnAttack(InputAction.CallbackContext context)
+    {
+        _attackPressed = context.ReadValueAsButton();
+    }
+    
+    /// <summary>
+    /// ポーズ入力イベントハンドラ
+    /// </summary>
+    private void OnPause(InputAction.CallbackContext context)
+    {
+        _pausePressed = context.ReadValueAsButton();
+        
+        if (_pausePressed)
+        {
+            // ポーズ処理 (GameManagerに通知など)
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.TogglePause();
+            }
+        }
+    }
+    
     /// <summary>
     /// ジャンプボタンが押されたかどうかを判定
     /// </summary>
-    /// <returns>ジャンプボタンが押されていればtrue</returns>
+    /// <returns>ジャンプボタンが押されたらtrue</returns>
     public bool IsJumpPressed()
     {
-        // キーボード入力
-        if (Input.GetKeyDown(jumpKey))
-        {
-            return true;
-        }
-        
-        // スワイプ上判定
-        if (DetectSwipeDirection() == SwipeDirection.Up)
-        {
-            return true;
-        }
-        
-        return false;
+        return _jumpPressed;
     }
-
+    
     /// <summary>
     /// スライドボタンが押されたかどうかを判定
     /// </summary>
-    /// <returns>スライドボタンが押されていればtrue</returns>
+    /// <returns>スライドボタンが押されたらtrue</returns>
     public bool IsSlidePressed()
     {
-        // キーボード入力
-        if (Input.GetKeyDown(slideKey))
-        {
-            return true;
-        }
-        
-        // スワイプ下判定
-        if (DetectSwipeDirection() == SwipeDirection.Down)
-        {
-            return true;
-        }
-        
-        return false;
+        return _slidePressed;
     }
-
+    
+    /// <summary>
+    /// 攻撃ボタンが押されたかどうかを判定
+    /// </summary>
+    /// <returns>攻撃ボタンが押されたらtrue</returns>
+    public bool IsAttackPressed()
+    {
+        return _attackPressed;
+    }
+    
     /// <summary>
     /// レーン変更方向を取得
     /// </summary>
     /// <returns>-1:左, 0:変更なし, 1:右</returns>
     public int GetLaneChangeDirection()
     {
-        // キーボード入力
-        if (Input.GetKeyDown(leftKey))
+        // 横方向の入力を取得
+        float horizontalInput = _moveInput.x;
+        
+        // デッドゾーン処理
+        if (Mathf.Abs(horizontalInput) < 0.5f)
         {
-            return -1;
+            return 0;
         }
         
-        if (Input.GetKeyDown(rightKey))
-        {
-            return 1;
-        }
-        
-        // スワイプ左右判定
-        SwipeDirection swipeDir = DetectSwipeDirection();
-        if (swipeDir == SwipeDirection.Left)
-        {
-            return -1;
-        }
-        else if (swipeDir == SwipeDirection.Right)
-        {
-            return 1;
-        }
-        
-        return 0;
+        // -1か1を返す
+        return (int)Mathf.Sign(horizontalInput);
     }
-
+    
     /// <summary>
-    /// 攻撃ボタンが押されたかどうかを判定
+    /// 生の移動入力値を取得
     /// </summary>
-    /// <returns>攻撃ボタンが押されていればtrue</returns>
-    public bool IsAttackPressed()
+    /// <returns>移動入力ベクトル</returns>
+    public Vector2 GetMoveInput()
     {
-        // キーボード入力
-        if (Input.GetKeyDown(attackKey))
-        {
-            return true;
-        }
-        
-        // タップ判定
-        if (DetectTap())
-        {
-            return true;
-        }
-        
-        return false;
+        return _moveInput;
     }
-
-    private void Update()
-    {
-        // タッチ入力の検出
-        DetectTouchInput();
-    }
-
+    
     /// <summary>
-    /// タッチ入力を検出する
+    /// ポーズボタンが押されたかどうかを判定
     /// </summary>
-    private void DetectTouchInput()
+    /// <returns>ポーズボタンが押されたらtrue</returns>
+    public bool IsPausePressed()
     {
-        // モバイル端末でない場合はスキップ
-        if (!Input.touchSupported && !Application.isEditor)
-        {
-            return;
-        }
-
-        // エディタでマウス入力をタッチとして扱う
-        if (Application.isEditor)
-        {
-            if (Input.GetMouseButtonDown(0))
-            {
-                _touchStartPosition = Input.mousePosition;
-                _touchStartTime = Time.time;
-                _isTouching = true;
-            }
-            else if (Input.GetMouseButtonUp(0) && _isTouching)
-            {
-                _touchEndPosition = Input.mousePosition;
-                _isTouching = false;
-            }
-        }
-        // 実機でのタッチ入力
-        else if (Input.touchCount > 0)
-        {
-            Touch touch = Input.GetTouch(0);
-            
-            if (touch.phase == TouchPhase.Began)
-            {
-                _touchStartPosition = touch.position;
-                _touchStartTime = Time.time;
-                _isTouching = true;
-            }
-            else if (touch.phase == TouchPhase.Ended && _isTouching)
-            {
-                _touchEndPosition = touch.position;
-                _isTouching = false;
-            }
-        }
+        return _pausePressed;
     }
-
+    
     /// <summary>
-    /// スワイプ方向を検出する
+    /// 入力状態をリセット
     /// </summary>
-    private SwipeDirection DetectSwipeDirection()
+    public void ResetInputs()
     {
-        // タッチ操作が終了していない場合は何もしない
-        if (_isTouching)
-        {
-            return SwipeDirection.None;
-        }
-        
-        // クールダウン中は何もしない
-        if (Time.time - _lastSwipeTime < _swipeCooldown)
-        {
-            return SwipeDirection.None;
-        }
-
-        // タッチ時間が長すぎる場合はスワイプと見なさない
-        if (Time.time - _touchStartTime > _maxTapDuration)
-        {
-            return SwipeDirection.None;
-        }
-
-        // スワイプ方向の判定
-        Vector2 swipeDelta = _touchEndPosition - _touchStartPosition;
-        float swipeDistance = swipeDelta.magnitude;
-        
-        if (swipeDistance > swipeThreshold)
-        {
-            _lastSwipeTime = Time.time;
-            
-            // 水平方向と垂直方向のどちらが大きいかで方向を判定
-            if (Mathf.Abs(swipeDelta.x) > Mathf.Abs(swipeDelta.y))
-            {
-                // 左右のスワイプ
-                return swipeDelta.x > 0 ? SwipeDirection.Right : SwipeDirection.Left;
-            }
-            else
-            {
-                // 上下のスワイプ
-                return swipeDelta.y > 0 ? SwipeDirection.Up : SwipeDirection.Down;
-            }
-        }
-        
-        return SwipeDirection.None;
-    }
-
-    /// <summary>
-    /// タップを検出する
-    /// </summary>
-    private bool DetectTap()
-    {
-        // タッチ操作が終了していない場合は何もしない
-        if (_isTouching)
-        {
-            return false;
-        }
-
-        // タッチ時間が長すぎる場合はタップと見なさない
-        if (Time.time - _touchStartTime > _maxTapDuration)
-        {
-            return false;
-        }
-
-        // タップ判定
-        Vector2 tapDelta = _touchEndPosition - _touchStartPosition;
-        float tapDistance = tapDelta.magnitude;
-        
-        if (tapDistance < tapMaxMovement)
-        {
-            // タップ動作をリセット
-            _touchStartPosition = Vector2.zero;
-            _touchEndPosition = Vector2.zero;
-            
-            return true;
-        }
-        
-        return false;
-    }
-
-    /// <summary>
-    /// スワイプ方向を表す列挙型
-    /// </summary>
-    private enum SwipeDirection
-    {
-        None,
-        Up,
-        Down,
-        Left,
-        Right
+        _moveInput = Vector2.zero;
+        _jumpPressed = false;
+        _slidePressed = false;
+        _attackPressed = false;
+        _pausePressed = false;
     }
 }
