@@ -6,13 +6,14 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 
 /// <summary>
 /// ステージを動的に生成するクラス
+/// 仕様に基づき、プレイヤーは原点に固定され、マップ側を動かす設計
 /// </summary>
 public class StageCreator : MonoBehaviour
 {
     #region Inspector Variables
     [Header("Stage Generation Settings")]
-    [Tooltip("プレイヤーからの距離がこの値より大きくなると新しいステージブロックを生成します")]
-    [SerializeField] private float generationDistance = 150f;
+    [Tooltip("プレイヤーからの距離がこの値より小さくなると新しいステージブロックを生成します")]
+    [SerializeField] private float generationThreshold = 150f;
     
     [Tooltip("ステージブロックの長さ（メートル）")]
     [SerializeField] private float stageBlockLength = 100f;
@@ -22,6 +23,13 @@ public class StageCreator : MonoBehaviour
     
     [Tooltip("ステージブロックのアドレッサブルキー")]
     [SerializeField] private List<string> stageBlockKeys = new List<string>();
+
+    [Header("Background Settings")]
+    [Tooltip("遠景オブジェクト")]
+    [SerializeField] private GameObject backgroundObject;
+    
+    [Tooltip("遠景の移動速度比率（プレイヤー速度に対する割合）")]
+    [SerializeField] private float backgroundMoveRatio = 0.5f;
     
     [Header("Object Pooling Settings")]
     [Tooltip("アイテムのプール設定")]
@@ -44,14 +52,27 @@ public class StageCreator : MonoBehaviour
     // オブジェクトプール
     private Dictionary<string, ObjectPool> objectPools = new Dictionary<string, ObjectPool>();
     
-    // 最後に生成したステージブロックの終点位置
-    private Vector3 lastBlockEndPosition = Vector3.zero;
+    // 現在のステージブロックの開始位置（z座標）
+    private float currentStagePosition = 0f;
+    
+    // 遠景の参照
+    private Transform backgroundTransform;
     
     // プレイヤーの参照
-    private Transform playerTransform;
+    private Player playerReference;
+    
+    // ゲームマネージャーの参照
+    private GameManager gameManager;
+    
+    // 前回のプレイヤー速度
+    private float lastPlayerSpeed = 0f;
     
     // ロード済みかどうか
     private bool isLoaded = false;
+    
+    // ステージ移動用の一時変数
+    private Vector3 stageMovement = Vector3.zero;
+    private Vector3 backgroundMovement = Vector3.zero;
     #endregion
 
     #region Unity Methods
@@ -61,12 +82,30 @@ public class StageCreator : MonoBehaviour
     private void Start()
     {
         // プレイヤーの参照を取得
-        playerTransform = GameObject.FindGameObjectWithTag("Player").transform;
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject != null)
+        {
+            playerReference = playerObject.GetComponent<Player>();
+        }
         
-        if (playerTransform == null)
+        if (playerReference == null)
         {
             Debug.LogError("プレイヤーが見つかりません。Playerタグが正しく設定されているか確認してください。");
             return;
+        }
+        
+        // ゲームマネージャーの参照を取得
+        gameManager = GameManager.Instance;
+        if (gameManager == null)
+        {
+            Debug.LogError("GameManagerが見つかりません。");
+            return;
+        }
+        
+        // 遠景の設定
+        if (backgroundObject != null)
+        {
+            backgroundTransform = backgroundObject.transform;
         }
         
         // ステージブロックのPrefabデータを読み込む
@@ -81,25 +120,22 @@ public class StageCreator : MonoBehaviour
     /// </summary>
     private void Update()
     {
-        if (!isLoaded || playerTransform == null) return;
+        if (!isLoaded || playerReference == null || gameManager == null) return;
         
-        // プレイヤーと最後のステージブロックの終点の距離を計算
-        float distanceToLastBlock = Vector3.Distance(
-            new Vector3(playerTransform.position.x, 0, playerTransform.position.z),
-            new Vector3(lastBlockEndPosition.x, 0, lastBlockEndPosition.z)
-        );
+        // プレイヤーの現在速度を取得
+        float playerSpeed = gameManager.GameSpeed;
         
-        // 一定距離以下になったら新しいステージブロックを生成
-        if (distanceToLastBlock < generationDistance)
-        {
-            GenerateNextStageBlock();
-            
-            // 最大数を超えたら古いステージブロックを削除
-            if (stageBlocks.Count > maxStageBlocks)
-            {
-                RemoveOldestStageBlock();
-            }
-        }
+        // ステージの移動処理
+        MoveStage(playerSpeed);
+        
+        // 遠景の移動処理
+        MoveBackground(playerSpeed);
+        
+        // 新しいステージブロックの生成判定
+        CheckForNewStageBlock();
+        
+        // 前回の速度を保存
+        lastPlayerSpeed = playerSpeed;
     }
 
     /// <summary>
@@ -111,6 +147,84 @@ public class StageCreator : MonoBehaviour
         foreach (var prefab in stageBlockPrefabs.Values)
         {
             Addressables.Release(prefab);
+        }
+    }
+    #endregion
+
+    #region Stage Movement Methods
+    /// <summary>
+    /// ステージを移動する
+    /// </summary>
+    private void MoveStage(float playerSpeed)
+    {
+        // プレイヤーの速度に応じてステージを後ろに移動
+        float moveDistance = playerSpeed * Time.deltaTime;
+        
+        // 各ステージブロックを移動
+        foreach (GameObject block in stageBlocks)
+        {
+            stageMovement.z = -moveDistance;
+            block.transform.position += stageMovement;
+        }
+        
+        // 現在位置を更新
+        currentStagePosition += moveDistance;
+    }
+
+    /// <summary>
+    /// 遠景を移動する
+    /// </summary>
+    private void MoveBackground(float playerSpeed)
+    {
+        if (backgroundTransform == null) return;
+        
+        // 遠景は比率に応じてゆっくり移動
+        float moveDistance = playerSpeed * backgroundMoveRatio * Time.deltaTime;
+        
+        backgroundMovement.z = -moveDistance;
+        backgroundTransform.position += backgroundMovement;
+        
+        // 遠景が一定距離離れたらループ
+        if (Mathf.Abs(backgroundTransform.position.z) > 1000f)
+        {
+            Vector3 resetPos = backgroundTransform.position;
+            resetPos.z = 0f;
+            backgroundTransform.position = resetPos;
+        }
+    }
+
+    /// <summary>
+    /// 新しいステージブロックが必要か確認する
+    /// </summary>
+    private void CheckForNewStageBlock()
+    {
+        // 現在のステージの最後尾のz座標を計算
+        float lastBlockEndZ = 0f;
+        if (stageBlocks.Count > 0)
+        {
+            GameObject lastBlock = stageBlocks[stageBlocks.Count - 1];
+            StageBlockData blockData = lastBlock.GetComponent<StageBlockData>();
+            
+            if (blockData != null)
+            {
+                lastBlockEndZ = blockData.GetEndPosition().z;
+            }
+            else
+            {
+                lastBlockEndZ = lastBlock.transform.position.z - stageBlockLength;
+            }
+        }
+        
+        // プレイヤーから見て前方にあるステージの長さが閾値以下になったら新しいブロックを生成
+        if (lastBlockEndZ > -generationThreshold)
+        {
+            GenerateNextStageBlock();
+            
+            // 最大数を超えたら古いステージブロックを削除
+            if (stageBlocks.Count > maxStageBlocks)
+            {
+                RemoveOldestStageBlock();
+            }
         }
     }
     #endregion
@@ -163,8 +277,34 @@ public class StageCreator : MonoBehaviour
         string randomKey = stageBlockKeys[Random.Range(0, stageBlockKeys.Count)];
         GameObject prefab = stageBlockPrefabs[randomKey];
         
+        // 次のブロックの開始位置を計算
+        Vector3 newBlockPosition = Vector3.zero;
+        
+        if (stageBlocks.Count > 0)
+        {
+            GameObject lastBlock = stageBlocks[stageBlocks.Count - 1];
+            StageBlockData lastBlockData = lastBlock.GetComponent<StageBlockData>();
+            
+            if (lastBlockData != null)
+            {
+                // 前のブロックの終点に合わせて配置
+                Vector3 endPos = lastBlockData.GetEndPosition();
+                newBlockPosition = new Vector3(0, 0, endPos.z);
+            }
+            else
+            {
+                // 前のブロックから一定距離後ろに配置
+                newBlockPosition = new Vector3(0, 0, lastBlock.transform.position.z - stageBlockLength);
+            }
+        }
+        else
+        {
+            // 最初のブロックはプレイヤーの位置から開始
+            newBlockPosition = new Vector3(0, 0, -stageBlockLength);
+        }
+        
         // プレハブからステージブロックをインスタンス化
-        GameObject stageBlock = Instantiate(prefab, lastBlockEndPosition, Quaternion.identity);
+        GameObject stageBlock = Instantiate(prefab, newBlockPosition, Quaternion.identity, transform);
         stageBlocks.Add(stageBlock);
         
         // ステージブロックのデータを取得
@@ -172,17 +312,11 @@ public class StageCreator : MonoBehaviour
         if (blockData == null)
         {
             Debug.LogWarning($"ステージブロック '{randomKey}' にStageBlockDataコンポーネントがありません。");
-            
-            // デフォルトの終点位置を計算
-            lastBlockEndPosition += Vector3.forward * stageBlockLength;
         }
         else
         {
             // ステージブロックに配置物を設定
             SetupStageBlockObjects(blockData);
-            
-            // 次の終点位置を計算
-            lastBlockEndPosition = blockData.GetEndPosition();
         }
     }
 
@@ -239,6 +373,25 @@ public class StageCreator : MonoBehaviour
                     obj.transform.localScale = data.scale;
                     obj.SetActive(true);
                     
+                    // グリッド位置情報を設定（PlayerがCollisionではなくGridPositionで判定するため）
+                    GridPositionData gridPosData = obj.GetComponent<GridPositionData>();
+                    if (gridPosData == null)
+                    {
+                        gridPosData = obj.AddComponent<GridPositionData>();
+                    }
+                    
+                    // グリッド位置を設定（1mグリッド）
+                    gridPosData.SetGridPosition(
+                        Mathf.FloorToInt(worldPosition.x),
+                        Mathf.FloorToInt(worldPosition.z)
+                    );
+                    
+                    // サイズが1x1より大きい場合は複数グリッドにまたがる
+                    if (data.gridWidth > 1 || data.gridLength > 1)
+                    {
+                        gridPosData.SetGridSize(data.gridWidth, data.gridLength);
+                    }
+                    
                     // ステージブロックに配置物を登録
                     blockData.RegisterPlacedObject(obj);
                 }
@@ -248,6 +401,53 @@ public class StageCreator : MonoBehaviour
                 Debug.LogWarning($"プールが見つかりません: {data.prefabKey}");
             }
         }
+    }
+    
+    /// <summary>
+    /// プレイヤーの現在位置からグリッド座標を取得
+    /// </summary>
+    public Vector2Int GetPlayerGridPosition()
+    {
+        if (playerReference == null) return Vector2Int.zero;
+        
+        // プレイヤーは原点に固定されているため、
+        // 実際のグリッド位置はステージの移動距離から計算
+        int gridX = Mathf.FloorToInt(playerReference.transform.position.x);
+        int gridZ = Mathf.FloorToInt(currentStagePosition);
+        
+        return new Vector2Int(gridX, gridZ);
+    }
+    
+    /// <summary>
+    /// 指定グリッドにあるオブジェクトを取得
+    /// </summary>
+    public List<GameObject> GetObjectsAtGrid(Vector2Int gridPosition)
+    {
+        List<GameObject> result = new List<GameObject>();
+        
+        // すべてのアクティブなステージブロックから検索
+        foreach (GameObject block in stageBlocks)
+        {
+            StageBlockData blockData = block.GetComponent<StageBlockData>();
+            if (blockData != null)
+            {
+                // ブロック内の配置オブジェクトを取得
+                List<GameObject> placedObjects = blockData.GetPlacedObjects();
+                
+                foreach (GameObject obj in placedObjects)
+                {
+                    if (!obj.activeInHierarchy) continue;
+                    
+                    GridPositionData gridData = obj.GetComponent<GridPositionData>();
+                    if (gridData != null && gridData.IsInGrid(gridPosition))
+                    {
+                        result.Add(obj);
+                    }
+                }
+            }
+        }
+        
+        return result;
     }
     #endregion
 
@@ -473,6 +673,14 @@ public class StageBlockData : MonoBehaviour
     }
 
     /// <summary>
+    /// 配置したオブジェクトのリストを取得する
+    /// </summary>
+    public List<GameObject> GetPlacedObjects()
+    {
+        return placedObjects;
+    }
+
+    /// <summary>
     /// 配置したオブジェクトをプールに戻す
     /// </summary>
     public void ReturnObjectsToPool()
@@ -508,4 +716,62 @@ public class PlacementData
     public Quaternion localRotation; // ローカル回転
     public Vector3 scale = Vector3.one; // スケール
     public string objectType;       // オブジェクトタイプ（アイテム、障害物、敵など）
+    public int gridWidth = 1;       // グリッド上の幅
+    public int gridLength = 1;      // グリッド上の長さ
+}
+
+/// <summary>
+/// グリッド位置情報を保持するコンポーネント
+/// </summary>
+public class GridPositionData : MonoBehaviour
+{
+    // グリッド上の位置（X軸：レーン、Z軸：前後）
+    private Vector2Int gridPosition;
+    
+    // オブジェクトのグリッドサイズ
+    private Vector2Int gridSize = new Vector2Int(1, 1);
+    
+    /// <summary>
+    /// グリッド位置を設定
+    /// </summary>
+    public void SetGridPosition(int x, int z)
+    {
+        gridPosition = new Vector2Int(x, z);
+    }
+    
+    /// <summary>
+    /// グリッドサイズを設定
+    /// </summary>
+    public void SetGridSize(int width, int length)
+    {
+        gridSize = new Vector2Int(width, length);
+    }
+    
+    /// <summary>
+    /// 指定位置がこのオブジェクトのグリッド内かチェック
+    /// </summary>
+    public bool IsInGrid(Vector2Int checkPosition)
+    {
+        // グリッド範囲内をチェック
+        return checkPosition.x >= gridPosition.x && 
+               checkPosition.x < gridPosition.x + gridSize.x && 
+               checkPosition.z >= gridPosition.z && 
+               checkPosition.z < gridPosition.z + gridSize.z;
+    }
+    
+    /// <summary>
+    /// グリッド位置を取得
+    /// </summary>
+    public Vector2Int GetGridPosition()
+    {
+        return gridPosition;
+    }
+    
+    /// <summary>
+    /// グリッドサイズを取得
+    /// </summary>
+    public Vector2Int GetGridSize()
+    {
+        return gridSize;
+    }
 }
