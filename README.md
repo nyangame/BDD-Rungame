@@ -11,6 +11,7 @@ ai_assist:
   format_style: markdown + toml + gherkin
   primary_targets:
     - ./spec/ubi/ubiquitous.toml
+    - ./spec/rule/coding.md
 ```
 
 # BDD-Rungame
