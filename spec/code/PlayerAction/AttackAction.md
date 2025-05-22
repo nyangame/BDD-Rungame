@@ -4,7 +4,6 @@
 - プレイヤーの攻撃状態の行動
 
 # 実装
-- MonoBehaviourを継承する
 - IPlayerActionを継承する
 
 # 処理フロー
