@@ -12,7 +12,7 @@ ai_assist:
   primary_targets:
     - ./spec/rule/general.md
     - ./spec/rule/coding.md
-    - ./spec/ubi/ubiquitous.toml
+    - ./spec/ubi/ubiquitous.yaml
 ```
 
 # BDD-Rungame
