@@ -1,0 +1,5 @@
+[PlacementObjectId]
+0 = "None"           # 何もなし
+1 = "CoinItem"       # コインアイテム
+2 = "BasicObstacle"  # 基本障害物
+3 = "BasicEnemy"     # 基本敵
