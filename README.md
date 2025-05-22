@@ -24,8 +24,8 @@ ai_assist:
 ### spec
 仕様書が入ります。  
 
-### program
-Claudeが書いたコードが入ります。
+### unity
+Unityプロジェクトです。ここにあるのは、すべてClaudeが書いたコードです。
 
 ### Data
 AIに作らせたデータが入ります。
