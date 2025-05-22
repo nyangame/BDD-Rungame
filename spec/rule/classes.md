@@ -12,12 +12,14 @@ IPlayerActionStateを継承したアクションを生成/所持し切り替え�
 
 ## StageCreator
 ステージを生成する  
+StageBehaviourからコールされる  
 
-## StageDirector
+## StageBehaviour
 ステージを移動させる  
-ステージの情報を持つ  
+ステージをどのくらい進んだかや、配置物の情報を持つ  
 
 ## HitDetector
 接触判定を統括する  
 
-## 
+## Item ←　IItemAction
+アクションインタフェースを定義したクラスを生成する
