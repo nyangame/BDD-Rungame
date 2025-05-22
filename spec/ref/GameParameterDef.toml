@@ -11,3 +11,7 @@ attack_cooldown = 0.5     # 攻撃クールタイム
 block_size = 100          # ブロックサイズ(m)
 lane_count = 3            # レーン数
 grid_size = 1.0           # グリッドサイズ(m)
+
+[input]
+buffer_time = 0.2     # 先行受付時間(秒)
+queue_size = 3        # 入力キューサイズ
