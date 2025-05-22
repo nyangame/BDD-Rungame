@@ -9,3 +9,6 @@
 ## ライブラリの利用
 - コルーチンはUniTaskを利用する事
 - イベント実装はR3を利用する事
+- interfaceを使用したクラスをインスペクタに表示するためにSubClassSelectorを使用する
+- ObjectPoolはUnity標準のものを使用する
+- 
