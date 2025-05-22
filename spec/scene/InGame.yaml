@@ -1,0 +1,9 @@
+# シーン構成は以下のルールで記載される
+# 第1階層はGameObjectとそれに命名される名前
+# 第2階層はアタッチされるコンポーネント
+
+GameManager:
+  - StageCreator
+
+Player:
+  - PlayerAction
