@@ -1,6 +1,9 @@
-# ゲーム中に期待される振る舞い
+# インゲーム中に期待される振る舞い
+インゲームはInGameシーンを使用する  
+InGameシーンの構成については```/spec/scene/InGame.md```を参照すること  
 
-## Feature: プレーヤー入力
+
+## Feature: プレイヤー入力
 
 #### Scenario: 移動入力の処理
   Given いつでも  
