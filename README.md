@@ -1,10 +1,10 @@
 ```
 ## 製品概要
 product_infomation:
-  title: "Rungame"
-  platform: [steam]
-  gamegenre: [ランゲーム]
-  reference: [テンプルラン]
+  title: Rungame
+  platform: [pc]
+  genre: [action, rungame]
+  reference: ["temple run"]
 
 ## AI アシスト
 ai_assist:
