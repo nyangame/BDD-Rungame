@@ -1,0 +1,13 @@
+# ゲーム内のパラメータ
+
+[player]
+lane_width = 2.0          # レーン幅
+move_speed = 1.0          # 基本移動速度
+jump_height = 2.0         # ジャンプ高度
+slide_duration = 1.0      # スライディング時間
+attack_cooldown = 0.5     # 攻撃クールタイム
+
+[stage]
+block_size = 100          # ブロックサイズ(m)
+lane_count = 3            # レーン数
+grid_size = 1.0           # グリッドサイズ(m)
